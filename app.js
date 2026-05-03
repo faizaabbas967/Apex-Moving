@@ -29,12 +29,6 @@ const copyText = document.getElementById('copy-text');
 const copyBtn = document.getElementById('copy-btn');
 const resetBtn = document.getElementById('reset-btn');
 
-// Auto-Magic Elements
-const smartText = document.getElementById('smart-text');
-const parseTextBtn = document.getElementById('parse-text-btn');
-const screenshotUpload = document.getElementById('screenshot-upload');
-const ocrStatus = document.getElementById('ocr-status');
-
 // Password Protection Logic
 const APP_PASSWORD = "Apex2026"; // CHANGE THIS to your preferred password
 const loginOverlay = document.getElementById('login-overlay');
@@ -216,153 +210,9 @@ hasStairsSelect.addEventListener('change', (e) => {
     }
 });
 
-// Auto-Magic Parsing Logic
-const COMMON_SUBURBS = [
-    'Wollert', 'Tullamarine', 'Preston', 'Manor Lakes', 'Dandenong', 'Berwick', 'Frankston', 'Cranbourne', 
-    'Pakenham', 'Narre Warren', 'Clayton', 'Mulgrave', 'Springvale', 'Melbourne', 'Richmond', 'St Kilda',
-    'Werribee', 'Hoppers Crossing', 'Point Cook', 'Tarneit', 'Epping', 'Craigieburn', 'Sunbury'
-];
 
-function parseAirtaskerText(rawText) {
-    if (!rawText) return;
-    
-    // 1. Clean the text
-    let text = rawText.replace(/[^\w\s\$\-\,\.\/]/g, ' ') 
-                      .replace(/\s+/g, ' ');
-    const lowerText = text.toLowerCase();
-    
-    console.log("Super Cleaned Text:", text);
 
-    // 2. Budget Detection
-    try {
-        const budgetPatterns = [
-            /(\d{2,4})\s*AUD\s*Budget/i,
-            /Budget\D+(\d{2,4})/,
-            /\$\s?(\d{2,4})/,
-            /(\d{2,4})\s?AUD/i,
-            /Budget[:\s]*\$?\s?(\d{2,4})/i
-        ];
-        for (let p of budgetPatterns) {
-            const m = text.match(p);
-            if (m) {
-                budgetInput.value = m[1] || m[2];
-                break;
-            }
-        }
-    } catch(e) {}
 
-    // 3. Pickup & Drop-off Detection (Super Suburb Detector)
-    try {
-        let pickup = "";
-        let dropoff = "";
-
-        // Strategy A: "from [Suburb] to [Suburb]"
-        const fromToMatch = text.match(/from\s+([A-Za-z\s\-]{3,20})\s+to\s+([A-Za-z\s\-]{3,20})/i);
-        if (fromToMatch) {
-            pickup = fromToMatch[1].trim();
-            dropoff = fromToMatch[2].trim();
-        }
-
-        // Strategy B: Keyword search
-        if (!pickup) {
-            const pMatch = text.match(/(?:Pick\s?up|From)[:\s]+([A-Za-z\s\-]{3,20})/i) || 
-                          text.match(/picked up from\s+([A-Za-z\s\-]{3,20})/i);
-            if (pMatch) pickup = pMatch[1].trim();
-        }
-        if (!dropoff) {
-            const dMatch = text.match(/(?:Drop\s?off|To)[:\s]+([A-Za-z\s\-]{3,20})/i) || 
-                          text.match(/dropped off to\s+([A-Za-z\s\-]{3,20})/i);
-            if (dMatch) dropoff = dMatch[1].trim();
-        }
-
-        // Strategy C: Scan for known suburbs if still missing
-        if (!pickup || !dropoff) {
-            const foundSuburbs = [];
-            COMMON_SUBURBS.forEach(sub => {
-                if (new RegExp(sub, 'gi').test(text)) {
-                    foundSuburbs.push(sub);
-                }
-            });
-
-            if (foundSuburbs.length >= 2) {
-                // If we found two known suburbs, and pickup is still empty
-                if (!pickup) pickup = foundSuburbs[0];
-                if (!dropoff) dropoff = foundSuburbs[1];
-            } else if (foundSuburbs.length === 1) {
-                if (!pickup) pickup = foundSuburbs[0];
-                else if (!dropoff && pickup.toLowerCase() !== foundSuburbs[0].toLowerCase()) dropoff = foundSuburbs[0];
-            }
-        }
-
-        // Final cleanup and assignment
-        if (pickup) {
-            pickupInput.value = pickup.replace(/VIC|Australia|3\d{3}|location|home/gi, '').trim();
-            pickupInput.dispatchEvent(new Event('input'));
-        }
-        if (dropoff) {
-            dropoffInput.value = dropoff.replace(/VIC|Australia|3\d{3}|location|home/gi, '').trim();
-            dropoffInput.dispatchEvent(new Event('input'));
-        }
-    } catch(e) {}
-
-    // 4. Items / Size Detection
-    try {
-        if (lowerText.includes('tv') || lowerText.includes('television')) {
-            itemsSelect.value = '1';
-        } else if (lowerText.includes('two') || lowerText.includes('2 items') || lowerText.includes('pair')) {
-            itemsSelect.value = 'couple';
-        } else if (lowerText.includes('three') || lowerText.includes('many') || lowerText.includes('lot')) {
-            itemsSelect.value = 'many';
-        } else {
-            const sizeMatch = text.match(/Removals size[:\s]*([A-Za-z0-9\s\+]+?)(?=\s[A-Z]|$|Budget)/i);
-            if (sizeMatch) {
-                const val = sizeMatch[1].toLowerCase();
-                if (val.includes('house') || val.includes('large') || val.includes('many')) itemsSelect.value = 'many';
-                else if (val.includes('apartment') || val.includes('couple') || val.includes('2-3')) itemsSelect.value = 'couple';
-                else itemsSelect.value = '1';
-            }
-        }
-    } catch(e) {}
-
-    // 5. Stairs Detection
-    try {
-        if ([/no stairs/i, /ground floor/i, /elevator/i, /lift/i].some(p => p.test(text))) {
-            hasStairsSelect.value = 'no';
-            flightsContainer.classList.add('hidden');
-        } else if (/stair|flight|level\s*[1-9]/i.test(text)) {
-            hasStairsSelect.value = 'yes';
-            flightsContainer.classList.remove('hidden');
-        }
-    } catch(e) {}
-}
-
-parseTextBtn.addEventListener('click', () => {
-    parseAirtaskerText(smartText.value);
-});
-
-screenshotUpload.addEventListener('change', async (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-
-    if (typeof Tesseract === 'undefined') {
-        alert("Image scanner is still loading in the background. Please wait a few seconds and try again.");
-        return;
-    }
-
-    ocrStatus.classList.remove('hidden');
-    
-    try {
-        const result = await Tesseract.recognize(file, 'eng');
-        smartText.value = result.data.text;
-        parseAirtaskerText(result.data.text);
-    } catch (err) {
-        console.error(err);
-        alert("Failed to read image. Please make sure it's a clear screenshot of text.");
-    } finally {
-        ocrStatus.classList.add('hidden');
-        screenshotUpload.value = ''; // reset
-    }
-});
 
 function setLoading(isLoading) {
     if (isLoading) {
