@@ -191,127 +191,121 @@ hasStairsSelect.addEventListener('change', (e) => {
 });
 
 // Auto-Magic Parsing Logic
+const COMMON_SUBURBS = [
+    'Wollert', 'Tullamarine', 'Preston', 'Manor Lakes', 'Dandenong', 'Berwick', 'Frankston', 'Cranbourne', 
+    'Pakenham', 'Narre Warren', 'Clayton', 'Mulgrave', 'Springvale', 'Melbourne', 'Richmond', 'St Kilda',
+    'Werribee', 'Hoppers Crossing', 'Point Cook', 'Tarneit', 'Epping', 'Craigieburn', 'Sunbury'
+];
+
 function parseAirtaskerText(rawText) {
     if (!rawText) return;
     
-    // Clean text: Fix common OCR errors
-    let text = rawText.replace(/\|/g, 'I')
+    // 1. Clean the text
+    let text = rawText.replace(/[^\w\s\$\-\,\.\/]/g, ' ') 
                       .replace(/\s+/g, ' ');
+    const lowerText = text.toLowerCase();
     
-    console.log("Parsing Text:", text);
+    console.log("Super Cleaned Text:", text);
 
-    // 1. Budget Detection (Enhanced for "60 AUD Budget" layout)
+    // 2. Budget Detection
     try {
         const budgetPatterns = [
             /(\d{2,4})\s*AUD\s*Budget/i,
             /Budget\D+(\d{2,4})/,
             /\$\s?(\d{2,4})/,
             /(\d{2,4})\s?AUD/i,
-            /Budget[:\s]*\$?\s?(\d{2,4})/i,
-            /Earn\s*?\$?\s*?(\d{2,4})/i
+            /Budget[:\s]*\$?\s?(\d{2,4})/i
         ];
-        
-        for (let pattern of budgetPatterns) {
-            const match = text.match(pattern);
-            if (match) {
-                budgetInput.value = (match[1] || match[2]); // Handle different capture groups
-                if (!budgetInput.value && match[1]) budgetInput.value = match[1];
+        for (let p of budgetPatterns) {
+            const m = text.match(p);
+            if (m) {
+                budgetInput.value = m[1] || m[2];
                 break;
             }
         }
     } catch(e) {}
 
-    // 2. Stairs Detection
+    // 3. Pickup & Drop-off Detection (Super Suburb Detector)
     try {
-        const noStairsPatterns = [/no stairs/i, /ground floor/i, /elevator/i, /lift/i, /stairs[:\s]*no/i, /0 stairs/i];
-        const hasStairsPatterns = [/stairs/i, /flight/i, /step/i, /level\s*[1-9]/i, /staircase/i];
+        let pickup = "";
+        let dropoff = "";
 
-        let foundNo = noStairsPatterns.some(p => p.test(text));
-        let foundYes = hasStairsPatterns.some(p => p.test(text));
+        // Strategy A: "from [Suburb] to [Suburb]"
+        const fromToMatch = text.match(/from\s+([A-Za-z\s\-]{3,20})\s+to\s+([A-Za-z\s\-]{3,20})/i);
+        if (fromToMatch) {
+            pickup = fromToMatch[1].trim();
+            dropoff = fromToMatch[2].trim();
+        }
 
-        if (foundNo && !text.toLowerCase().includes('and stairs')) {
-            hasStairsSelect.value = 'no';
-            flightsContainer.classList.add('hidden');
-        } else if (foundYes) {
-            hasStairsSelect.value = 'yes';
-            flightsContainer.classList.remove('hidden');
-            const flightMatch = text.match(/([1-3])\s*(flight|floor|stair|level)/i) || text.match(/(one|two|three)\s*(flight|floor|stair|level)/i);
-            if (flightMatch) {
-                let val = flightMatch[1].toLowerCase();
-                if (val === '1' || val === 'one') flightsSelect.value = '1';
-                else if (val === '2' || val === 'two') flightsSelect.value = '2';
-                else if (val === '3' || val === 'three' || val === 'multiple') flightsSelect.value = '3';
-            } else {
-                flightsSelect.value = '1';
+        // Strategy B: Keyword search
+        if (!pickup) {
+            const pMatch = text.match(/(?:Pick\s?up|From)[:\s]+([A-Za-z\s\-]{3,20})/i) || 
+                          text.match(/picked up from\s+([A-Za-z\s\-]{3,20})/i);
+            if (pMatch) pickup = pMatch[1].trim();
+        }
+        if (!dropoff) {
+            const dMatch = text.match(/(?:Drop\s?off|To)[:\s]+([A-Za-z\s\-]{3,20})/i) || 
+                          text.match(/dropped off to\s+([A-Za-z\s\-]{3,20})/i);
+            if (dMatch) dropoff = dMatch[1].trim();
+        }
+
+        // Strategy C: Scan for known suburbs if still missing
+        if (!pickup || !dropoff) {
+            const foundSuburbs = [];
+            COMMON_SUBURBS.forEach(sub => {
+                if (new RegExp(sub, 'gi').test(text)) {
+                    foundSuburbs.push(sub);
+                }
+            });
+
+            if (foundSuburbs.length >= 2) {
+                // If we found two known suburbs, and pickup is still empty
+                if (!pickup) pickup = foundSuburbs[0];
+                if (!dropoff) dropoff = foundSuburbs[1];
+            } else if (foundSuburbs.length === 1) {
+                if (!pickup) pickup = foundSuburbs[0];
+                else if (!dropoff && pickup.toLowerCase() !== foundSuburbs[0].toLowerCase()) dropoff = foundSuburbs[0];
             }
+        }
+
+        // Final cleanup and assignment
+        if (pickup) {
+            pickupInput.value = pickup.replace(/VIC|Australia|3\d{3}|location|home/gi, '').trim();
+            pickupInput.dispatchEvent(new Event('input'));
+        }
+        if (dropoff) {
+            dropoffInput.value = dropoff.replace(/VIC|Australia|3\d{3}|location|home/gi, '').trim();
+            dropoffInput.dispatchEvent(new Event('input'));
         }
     } catch(e) {}
 
-    // 3. Items / Removals Size (Added TV detection)
+    // 4. Items / Size Detection
     try {
-        if (text.toLowerCase().includes('tv') || text.toLowerCase().includes('television')) {
+        if (lowerText.includes('tv') || lowerText.includes('television')) {
             itemsSelect.value = '1';
+        } else if (lowerText.includes('two') || lowerText.includes('2 items') || lowerText.includes('pair')) {
+            itemsSelect.value = 'couple';
+        } else if (lowerText.includes('three') || lowerText.includes('many') || lowerText.includes('lot')) {
+            itemsSelect.value = 'many';
         } else {
-            const sizePatterns = [
-                /Removals size[:\s]*([A-Za-z0-9\s\+]+?)(?=\s[A-Z]|$|Budget|Date)/i,
-                /Items[:\s]*([A-Za-z0-9\s,\+]+?)(?=\s[A-Z]|$|Budget|Date)/i
-            ];
-
-            let sizeFound = false;
-            for (let p of sizePatterns) {
-                const match = text.match(p);
-                if (match) {
-                    const val = match[1].toLowerCase();
-                    if (val.includes('house') || val.includes('large') || val.includes('many') || val.includes('4+') || val.includes('lot')) {
-                        itemsSelect.value = 'many';
-                    } else if (val.includes('apartment') || val.includes('few') || val.includes('couple') || val.includes('2-3') || val.includes('medium')) {
-                        itemsSelect.value = 'couple';
-                    } else {
-                        itemsSelect.value = '1';
-                    }
-                    sizeFound = true;
-                    break;
-                }
-            }
-
-            if (!sizeFound) {
-                const commonItems = ['fridge', 'sofa', 'bed', 'couch', 'table', 'washing machine', 'dryer', 'wardrobe', 'desk', 'cabinet'];
-                let count = 0;
-                commonItems.forEach(item => {
-                    const regex = new RegExp(item, 'gi');
-                    const matches = text.match(regex);
-                    if (matches) count += matches.length;
-                });
-                if (count >= 4) itemsSelect.value = 'many';
-                else if (count >= 2) itemsSelect.value = 'couple';
+            const sizeMatch = text.match(/Removals size[:\s]*([A-Za-z0-9\s\+]+?)(?=\s[A-Z]|$|Budget)/i);
+            if (sizeMatch) {
+                const val = sizeMatch[1].toLowerCase();
+                if (val.includes('house') || val.includes('large') || val.includes('many')) itemsSelect.value = 'many';
+                else if (val.includes('apartment') || val.includes('couple') || val.includes('2-3')) itemsSelect.value = 'couple';
                 else itemsSelect.value = '1';
             }
         }
     } catch(e) {}
 
-    // 4. Pickup & Drop-off Detection (Smart Suburb Matching)
+    // 5. Stairs Detection
     try {
-        // Look for "picked up from [Suburb]" or "dropped off to [Suburb]"
-        const pickupRegex = /picked up from\s+([A-Za-z\s\-]{3,20})(?:\s+and|dropped|\.|$|VIC)/i;
-        const dropoffRegex = /dropped off to\s+(?:my home in\s+)?([A-Za-z\s\-]{3,20})(?:\.|$|VIC)/i;
-        
-        const pMatch = text.match(pickupRegex);
-        if (pMatch) {
-            pickupInput.value = pMatch[1].trim();
-            pickupInput.dispatchEvent(new Event('input'));
-        }
-
-        const dMatch = text.match(dropoffRegex);
-        if (dMatch) {
-            dropoffInput.value = dMatch[1].trim();
-            dropoffInput.dispatchEvent(new Event('input'));
-        } else {
-            // Fallback: Check the very top of the text (Manor Lakes VIC 3024)
-            const topLocationMatch = text.match(/^([A-Za-z\s\-]{3,20})\s+VIC/i);
-            if (topLocationMatch && !pickupInput.value.includes(topLocationMatch[1].trim())) {
-                dropoffInput.value = topLocationMatch[1].trim();
-                dropoffInput.dispatchEvent(new Event('input'));
-            }
+        if ([/no stairs/i, /ground floor/i, /elevator/i, /lift/i].some(p => p.test(text))) {
+            hasStairsSelect.value = 'no';
+            flightsContainer.classList.add('hidden');
+        } else if (/stair|flight|level\s*[1-9]/i.test(text)) {
+            hasStairsSelect.value = 'yes';
+            flightsContainer.classList.remove('hidden');
         }
     } catch(e) {}
 }
