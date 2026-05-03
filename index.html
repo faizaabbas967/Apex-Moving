@@ -19,7 +19,7 @@
                 <h1 style="font-size: 24px;">Apex Secure</h1>
             </div>
             <p style="text-align: center; margin-bottom: 24px; color: var(--text-muted);">Enter password to access the Quote Engine</p>
-            <input type="password" id="app-password" placeholder="Password" style="width: 100%; margin-bottom: 16px; padding: 12px;">
+            <input type="password" id="app-password" placeholder="Password" style="width: 100%; margin-bottom: 16px; padding: 12px; border-radius: 8px; border: 1px solid var(--border); background: var(--bg-color); color: white;">
             <button id="login-btn" class="btn-primary" style="width: 100%;">Unlock System</button>
             <p id="login-error" class="error-text hidden" style="margin-top: 12px; text-align: center; color: #ef4444; font-size: 13px;">Incorrect password. Access denied.</p>
         </div>
@@ -40,7 +40,144 @@
         </header>
 
         <main class="main-content">
-            <!-- ... existing content ... -->
+            <!-- Auto-Magic Section -->
+            <div class="card" style="margin-bottom: 24px; background: rgba(245, 158, 11, 0.05); border-color: var(--primary);">
+                <h3 style="color: var(--primary); margin-bottom: 12px; font-size: 15px; display: flex; align-items: center; gap: 8px;">
+                    ✨ Airtasker Auto-Fill
+                </h3>
+                <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 12px;">Paste description or upload screenshot to instantly fill the form.</p>
+                
+                <textarea id="smart-text" placeholder="Paste Airtasker text here..." style="width: 100%; height: 80px; margin-bottom: 12px; background: var(--bg-color); color: white; border: 1px solid var(--border); border-radius: 8px; padding: 10px; font-family: inherit; font-size: 13px; resize: none;"></textarea>
+                
+                <div style="display: flex; gap: 10px;">
+                    <button type="button" id="parse-text-btn" class="btn-secondary" style="flex: 1;">Magic Fill</button>
+                    <label for="screenshot-upload" class="btn-secondary" style="flex: 1; text-align: center; margin: 0; display: flex; align-items: center; justify-content: center; cursor: pointer;">📷 Scan Image</label>
+                    <input type="file" id="screenshot-upload" accept="image/*" class="hidden">
+                </div>
+                <div id="ocr-status" style="font-size: 12px; color: var(--primary); margin-top: 10px; text-align: center;" class="hidden">Scanning image... Please wait.</div>
+            </div>
+
+            <form id="quote-form" class="card">
+                <div class="form-group">
+                    <label for="pickup">Pickup Address</label>
+                    <div class="input-wrapper autocomplete-wrapper">
+                        <input type="text" id="pickup" placeholder="E.g. Frankston" autocomplete="off" required>
+                        <span class="icon">📍</span>
+                        <ul id="pickup-suggestions" class="suggestions-list hidden"></ul>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="dropoff">Drop-off Address</label>
+                    <div class="input-wrapper autocomplete-wrapper">
+                        <input type="text" id="dropoff" placeholder="E.g. Berwick" autocomplete="off" required>
+                        <span class="icon">🏁</span>
+                        <ul id="dropoff-suggestions" class="suggestions-list hidden"></ul>
+                    </div>
+                </div>
+
+                <div id="live-distances" class="distances hidden" style="margin-bottom: 20px;">
+                    <div class="distance-item">
+                        <span class="label">Dandenong to Pickup:</span>
+                        <span class="value" id="live-d1">Calculating...</span>
+                    </div>
+                    <div class="distance-item">
+                        <span class="label">Pickup to Drop-off:</span>
+                        <span class="value" id="live-d2">Calculating...</span>
+                    </div>
+                </div>
+
+                <div class="row">
+                    <div class="form-group half">
+                        <label for="items">Items</label>
+                        <select id="items">
+                            <option value="1">1 Item</option>
+                            <option value="couple">Couple (2-3)</option>
+                            <option value="many">Many (4+)</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group half">
+                        <label for="budget">Customer Budget ($)</label>
+                        <div class="input-wrapper">
+                            <input type="number" id="budget" placeholder="E.g. 350">
+                            <span class="icon">💰</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="row">
+                    <div class="form-group half">
+                        <label for="has-stairs">Are there stairs?</label>
+                        <select id="has-stairs">
+                            <option value="no">No (or Lift available)</option>
+                            <option value="yes">Yes</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group half hidden" id="flights-container">
+                        <label for="flights">How many flights?</label>
+                        <select id="flights">
+                            <option value="1">1 Flight</option>
+                            <option value="2">2 Flights</option>
+                            <option value="3">3+ Flights</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="checklist">
+                    <h3>Important Checks</h3>
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="no-banned" checked> No banned items (Pool table, Spa, etc.)
+                    </label>
+                </div>
+
+                <button type="submit" class="btn-primary" id="calculate-btn">
+                    <span class="btn-text">Calculate Offer</span>
+                    <div class="spinner hidden"></div>
+                </button>
+            </form>
+
+            <div id="results" class="results-card hidden">
+                <div class="result-header">
+                    <h2>Recommended Offer</h2>
+                    <button id="reset-btn" class="btn-icon">↺</button>
+                </div>
+                
+                <div class="price-display">
+                    <span class="currency">$</span>
+                    <span class="amount" id="result-price">0</span>
+                </div>
+                <div class="time-display" id="result-time">0 hours</div>
+
+                <div class="distances">
+                    <div class="distance-item">
+                        <span class="label">Dandenong to Pickup:</span>
+                        <span class="value" id="dist-d1">0 km</span>
+                    </div>
+                    <div class="distance-item">
+                        <span class="label">Pickup to Drop-off:</span>
+                        <span class="value" id="dist-d2">0 km</span>
+                    </div>
+                </div>
+
+                <div class="rule-matched">
+                    <span class="label">Rule Applied:</span>
+                    <p id="rule-text">-</p>
+                </div>
+
+                <div class="message-template">
+                    <h3>Copy Message</h3>
+                    <div class="copy-box" id="copy-text">
+Hi, send me your contact number, pick up address and drop off address please. 
+Just to confirm, the quote includes up to [HOURS] hours of service. If additional time is required to complete the job, it will be charged at $40 per 15 minutes as mentioned.
+Thank you.
+                    </div>
+                    <button id="copy-btn" class="btn-secondary">Copy Message</button>
+                </div>
+            </div>
+            
+            <div id="error-box" class="error-box hidden"></div>
         </main>
         
         <footer class="branding-footer">
