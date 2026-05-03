@@ -35,6 +35,32 @@ const parseTextBtn = document.getElementById('parse-text-btn');
 const screenshotUpload = document.getElementById('screenshot-upload');
 const ocrStatus = document.getElementById('ocr-status');
 
+// Password Protection Logic
+const APP_PASSWORD = "Apex2026"; // CHANGE THIS to your preferred password
+const loginOverlay = document.getElementById('login-overlay');
+const mainApp = document.getElementById('main-app');
+const passwordInput = document.getElementById('app-password');
+const loginBtn = document.getElementById('login-btn');
+const loginError = document.getElementById('login-error');
+
+function checkPassword() {
+    if (passwordInput.value === APP_PASSWORD) {
+        loginOverlay.classList.add('hidden');
+        mainApp.classList.remove('hidden');
+        // Clear password for security
+        passwordInput.value = "";
+    } else {
+        loginError.classList.remove('hidden');
+        passwordInput.style.borderColor = "var(--error)";
+        passwordInput.value = "";
+    }
+}
+
+loginBtn.addEventListener('click', checkPassword);
+passwordInput.addEventListener('keypress', (e) => {
+    if (e.key === 'Enter') checkPassword();
+});
+
 // Helper to delay
 const delay = ms => new Promise(res => setTimeout(res, ms));
 
