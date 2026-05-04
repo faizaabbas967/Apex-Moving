@@ -49,21 +49,32 @@ async function handleAutocomplete(e, listElement) {
     
     autocompleteTimeout = setTimeout(async () => {
         try {
-            // Focus on Australia using countrycodes=au
-            const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&countrycodes=au&q=${encodeURIComponent(query)}&limit=5`);
+            // Using Photon API (komoot.io) for superior fuzzy search and typo tolerance
+            // Biasing search towards Victoria/Dandenong area
+            const res = await fetch(`https://photon.komoot.io/api/?q=${encodeURIComponent(query)}&limit=5&lat=${DANDENONG_COORDS.lat}&lon=${DANDENONG_COORDS.lon}&location_bias_scale=0.6`);
             const data = await res.json();
             
             listElement.innerHTML = '';
-            if (data && data.length > 0) {
-                data.forEach(item => {
+            if (data && data.features && data.features.length > 0) {
+                data.features.forEach(feature => {
+                    const props = feature.properties;
+                    const coords = feature.geometry.coordinates; // [lon, lat]
+                    
                     const li = document.createElement('li');
-                    const parts = item.display_name.split(', ');
-                    li.textContent = parts.slice(0, 3).join(', '); // Show cleaner address
+                    
+                    // Construct a readable address from Photon properties
+                    const addressParts = [];
+                    if (props.name) addressParts.push(props.name);
+                    if (props.city && props.city !== props.name) addressParts.push(props.city);
+                    if (props.state) addressParts.push(props.state);
+                    if (props.postcode) addressParts.push(props.postcode);
+                    
+                    li.textContent = addressParts.join(', ');
                     
                     li.addEventListener('click', async () => {
                         e.target.value = li.textContent;
-                        e.target.dataset.lat = item.lat;
-                        e.target.dataset.lon = item.lon;
+                        e.target.dataset.lat = coords[1]; // lat
+                        e.target.dataset.lon = coords[0]; // lon
                         listElement.classList.add('hidden');
                         await updateLiveDistances();
                     });
@@ -77,7 +88,7 @@ async function handleAutocomplete(e, listElement) {
         } catch (err) {
             console.error("Autocomplete failed", err);
         }
-    }, 400); // 400ms debounce
+    }, 300); // Slightly faster debounce for better feel
 }
 
 // Geocode address using Nominatim (OpenStreetMap)
@@ -87,19 +98,19 @@ async function geocodeAddress(address) {
         return { isManualDist: true, dist: parseFloat(numMatch[1]) };
     }
 
-    let query = address;
-    if (!query.toLowerCase().includes('victoria') && !query.toLowerCase().includes('vic')) {
-        query += ', Victoria, Australia';
-    }
-
     try {
-        const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=1`);
+        // Using Photon for geocoding to maintain typo tolerance on submit
+        const res = await fetch(`https://photon.komoot.io/api/?q=${encodeURIComponent(query)}&limit=1&lat=${DANDENONG_COORDS.lat}&lon=${DANDENONG_COORDS.lon}`);
         const data = await res.json();
-        if (data && data.length > 0) {
+        if (data && data.features && data.features.length > 0) {
+            const feature = data.features[0];
+            const props = feature.properties;
+            const coords = feature.geometry.coordinates;
+            
             return {
-                lat: parseFloat(data[0].lat),
-                lon: parseFloat(data[0].lon),
-                displayName: data[0].display_name
+                lat: coords[1],
+                lon: coords[0],
+                displayName: `${props.name || ''} ${props.city || ''} ${props.state || ''}`.trim()
             };
         }
     } catch (e) {
