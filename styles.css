@@ -245,6 +245,22 @@ input[type="checkbox"] {
     color: var(--primary);
 }
 
+.suggestions-list li.searching,
+.suggestions-list li.no-results {
+    padding: 16px;
+    font-size: 13px;
+    color: var(--text-muted);
+    font-style: italic;
+    cursor: default;
+    background: transparent;
+    text-align: center;
+}
+
+.suggestions-list li.no-results {
+    color: var(--error);
+    font-style: normal;
+}
+
 /* Results Card */
 .results-card {
     background: linear-gradient(145deg, var(--surface) 0%, #151e2e 100%);

@@ -49,9 +49,11 @@ async function handleAutocomplete(e, listElement) {
     
     autocompleteTimeout = setTimeout(async () => {
         try {
-            // Using Photon API (komoot.io) for superior fuzzy search and typo tolerance
-            // Biasing search towards Victoria/Dandenong area
-            const res = await fetch(`https://photon.komoot.io/api/?q=${encodeURIComponent(query)}&limit=5&lat=${DANDENONG_COORDS.lat}&lon=${DANDENONG_COORDS.lon}&location_bias_scale=0.6`);
+            listElement.innerHTML = '<li class="searching">Searching for similar addresses...</li>';
+            listElement.classList.remove('hidden');
+
+            // Using Photon API with lower bias and higher limit to catch more fuzzy matches
+            const res = await fetch(`https://photon.komoot.io/api/?q=${encodeURIComponent(query)}&limit=10&lat=${DANDENONG_COORDS.lat}&lon=${DANDENONG_COORDS.lon}&location_bias_scale=0.3&lang=en`);
             const data = await res.json();
             
             listElement.innerHTML = '';
@@ -66,8 +68,8 @@ async function handleAutocomplete(e, listElement) {
                     const addressParts = [];
                     if (props.name) addressParts.push(props.name);
                     if (props.city && props.city !== props.name) addressParts.push(props.city);
+                    if (props.district) addressParts.push(props.district);
                     if (props.state) addressParts.push(props.state);
-                    if (props.postcode) addressParts.push(props.postcode);
                     
                     li.textContent = addressParts.join(', ');
                     
@@ -81,14 +83,14 @@ async function handleAutocomplete(e, listElement) {
                     
                     listElement.appendChild(li);
                 });
-                listElement.classList.remove('hidden');
             } else {
-                listElement.classList.add('hidden');
+                listElement.innerHTML = '<li class="no-results">No similar addresses found. Try checking your spelling or adding "Vic".</li>';
             }
         } catch (err) {
             console.error("Autocomplete failed", err);
+            listElement.classList.add('hidden');
         }
-    }, 300); // Slightly faster debounce for better feel
+    }, 400); // 400ms debounce for more stable results
 }
 
 // Geocode address using Nominatim (OpenStreetMap)
