@@ -29,32 +29,6 @@ const copyText = document.getElementById('copy-text');
 const copyBtn = document.getElementById('copy-btn');
 const resetBtn = document.getElementById('reset-btn');
 
-// Password Protection Logic
-const APP_PASSWORD = "Apex2026"; // CHANGE THIS to your preferred password
-const loginOverlay = document.getElementById('login-overlay');
-const mainApp = document.getElementById('main-app');
-const passwordInput = document.getElementById('app-password');
-const loginBtn = document.getElementById('login-btn');
-const loginError = document.getElementById('login-error');
-
-function checkPassword() {
-    if (passwordInput.value === APP_PASSWORD) {
-        loginOverlay.classList.add('hidden');
-        mainApp.classList.remove('hidden');
-        // Clear password for security
-        passwordInput.value = "";
-    } else {
-        loginError.classList.remove('hidden');
-        passwordInput.style.borderColor = "var(--error)";
-        passwordInput.value = "";
-    }
-}
-
-loginBtn.addEventListener('click', checkPassword);
-passwordInput.addEventListener('keypress', (e) => {
-    if (e.key === 'Enter') checkPassword();
-});
-
 // Helper to delay
 const delay = ms => new Promise(res => setTimeout(res, ms));
 
@@ -375,6 +349,19 @@ form.addEventListener('submit', async (e) => {
 resetBtn.addEventListener('click', () => {
     resultsCard.classList.add('hidden');
     form.classList.remove('hidden');
+    
+    // Clear addresses and hidden data
+    pickupInput.value = "";
+    dropoffInput.value = "";
+    delete pickupInput.dataset.lat;
+    delete pickupInput.dataset.lon;
+    delete dropoffInput.dataset.lat;
+    delete dropoffInput.dataset.lon;
+    
+    // Hide live distances
+    liveDistances.classList.add('hidden');
+    liveD1.textContent = "Calculating...";
+    liveD2.textContent = "Calculating...";
 });
 
 copyBtn.addEventListener('click', () => {
